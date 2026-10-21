@@ -3,6 +3,9 @@
 # Changes #
 
 * @dev (????-??-??)
+  * Fixed an endless repaint loop that froze the user interface when two buses of different
+    widths were connected, pegging a CPU core and growing the heap without bound
+    [#3121] (@MissDev-glitch2).
   * Drew `$...$` formulas on canvas labels, including overlines, while keeping the source text in the
     editor and in TikZ export [#2942] (@Vadimatorik).
   * Extended label formulas with modulus, comparisons, bare subscripts, and superscripts

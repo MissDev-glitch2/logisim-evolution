@@ -110,7 +110,7 @@ public class Canvas extends JPanel implements LocaleListener, CanvasPaneContents
   private final Project proj;
   private final Selection selection;
   private final MyListener myListener = new MyListener();
-  private final MyViewport viewport = new MyViewport();
+  final MyViewport viewport = new MyViewport();
   private final MyProjectListener myProjectListener = new MyProjectListener();
   private final TickCounter tickCounter;
   private final CanvasPaintCoordinator paintCoordinator;
@@ -684,6 +684,8 @@ public class Canvas extends JPanel implements LocaleListener, CanvasPaneContents
     if (x < 0) x = 0;
     if (y < 0) y = 0;
     setArrows(x, y, x + circBds.getWidth(), y + circBds.getHeight());
+    // setArrows() does not repaint on its own, so the arrows are refreshed here.
+    viewport.repaint();
   }
 
   public void setArrows(int x0, int y0, int x1, int y1) {
@@ -729,7 +731,12 @@ public class Canvas extends JPanel implements LocaleListener, CanvasPaneContents
     }
     if (isEast && !viewport.isSoutheast && !viewport.isNortheast) viewport.setEast(true);
     if (isWest && !viewport.isSouthwest && !viewport.isNorthwest) viewport.setWest(true);
-    viewport.repaint();
+    // NOTE: this method must not request a repaint. It is called from
+    // computeViewportContents(), which runs inside the paint pass, so repainting
+    // here would schedule another paint, which would call this method again,
+    // and so on - an endless repaint loop that pegs a CPU core and keeps
+    // allocating (see issue #3121). Callers that change the arrows outside of a
+    // paint pass are responsible for requesting the repaint themselves.
   }
 
   void setHaloedComponent(Circuit circ, Component comp) {
@@ -1248,7 +1255,7 @@ public class Canvas extends JPanel implements LocaleListener, CanvasPaneContents
     }
   }
 
-  private class MyViewport extends JViewport {
+  class MyViewport extends JViewport {
 
     private static final long serialVersionUID = 1L;
     StringGetter errorMessage = null;
@@ -1265,8 +1272,22 @@ public class Canvas extends JPanel implements LocaleListener, CanvasPaneContents
     boolean zoomButtonVisible = false;
     Color zoomButtonColor = DEFAULT_ZOOM_BUTTON_COLOR;
 
+    /**
+     * Counts the repaint requests made on this viewport.
+     *
+     * <p>Used by the tests to assert that painting never schedules another paint, which would
+     * turn into an endless repaint loop (see issue #3121).
+     */
+    int repaintRequests = 0;
+
     MyViewport() {
       // dummy
+    }
+
+    @Override
+    public void repaint() {
+      repaintRequests++;
+      super.repaint();
     }
 
     void clearArrows() {
